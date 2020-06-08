@@ -1,6 +1,0 @@
-runtime: go112
-
-env_variables:
-  DISCORD_TWITTER_BOT: "Bot NzA0NTg3NzA2MTQyOTQ5Mzg3.XqfUfA.JzLpq_G2TvgUPkspKf_VWxikUOc"
-  TWITTER_KEY: "cMzarvXqqSTXLMagAEK9suk3c"
-  TWITTER_SECRET: "M0xc8yhgGk6aaPTKYGaBM1oKtlN9qp1UmEwTBqE46BhDU3kYch"
