@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"github.com/dghubble/go-twitter/twitter"
 	"log"
 	"math/rand"
 	"os"
@@ -10,13 +12,16 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/oauth2/clientcredentials"
+
 	"github.com/bwmarrin/discordgo"
 )
 
-// Session is declared in the global space so it can be easily used
-// throughout this program.
+// Session is declared in the global space so it can be easily used throughout this program.
 // In this use case, there is no error that would be returned.
+// We also declare the twitter Client for easy use as well.
 var Session, _ = discordgo.New()
+var Client *twitter.Client
 
 // Read in all options from environment variables and command line arguments.
 func init() {
@@ -28,10 +33,21 @@ func init() {
 		// Pointer, flag, default, description
 		flag.StringVar(&Session.Token, "t", "", "Discord Authentication Token")
 	}
+
+	// Twitter Authentication Token
+	config := &clientcredentials.Config{
+		ClientID:     os.Getenv("TWITTER_KEY"),
+		ClientSecret: os.Getenv("TWITTER_SECRET"),
+		TokenURL:     "https://api.twitter.com/oauth2/token",
+	}
+	if config.ClientID == "" || config.ClientSecret == "" {
+		log.Println("You must provide a Twitter key and secret key.")
+	}
+	httpClient := config.Client(context.Background())
+	Client = twitter.NewClient(httpClient)
 }
 
 func main() {
-
 	// Declare any variables needed later.
 	var err error
 
@@ -66,7 +82,38 @@ func main() {
 	defer Session.Close()
 	errCheck("Error opening connection to Discord", err)
 
+	twitterHandler()
+
 	<-interrupt
+}
+
+func twitterHandler() {
+	// Twitter rate limits requests to 100,000 per day OR 1500 per min so we check every 5 sec
+	for {
+		if time.Now().Second()%5 == 0 {
+			//tweets := getTweets()
+			//fmt.Println("********************START********************")
+			//for _, t := range tweets {
+			//	fmt.Printf("%+v\n", t.Text)
+			//}
+			//fmt.Println("********************END********************")
+		}
+		time.Sleep(time.Second)
+	}
+
+}
+
+func getTweets(screenName string, c int) []twitter.Tweet {
+	tweets, _, err := Client.Timelines.UserTimeline(&twitter.UserTimelineParams{
+		ScreenName:     screenName,
+		Count:          c,
+		ExcludeReplies: newTrue(),
+	})
+	tweets = tweets[:c] // Count does not actually reduce the number of tweets received.
+	if err != nil {
+		log.Printf("Error retrieving tweets from timeline: %+v", err)
+	}
+	return tweets
 }
 
 func errCheck(msg string, err error) {
@@ -74,4 +121,9 @@ func errCheck(msg string, err error) {
 		fmt.Printf("%s: %+v", msg, err)
 		panic(err)
 	}
+}
+
+func newTrue() *bool {
+	b := true
+	return &b
 }
