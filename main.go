@@ -28,20 +28,20 @@ func init() {
 	rand.Seed(time.Now().Unix())
 
 	// Discord Authentication Token
-	Session.Token = os.Getenv("DISCORD_TWITTER_BOT")
+	Session.Token = os.Getenv("DISCORD_SABRES_TWITTER_BOT")
 	if Session.Token == "" {
 		// Pointer, flag, default, description
 		flag.StringVar(&Session.Token, "t", "", "Discord Authentication Token")
 	}
 
-	// Twitter Authentication Token
+	// Twitter Access Token
 	config := &clientcredentials.Config{
-		ClientID:     os.Getenv("TWITTER_KEY"),
-		ClientSecret: os.Getenv("TWITTER_SECRET"),
+		ClientID:     os.Getenv("SABRES_TWITTER_API_KEY"),
+		ClientSecret: os.Getenv("SABRES_TWITTER_API_SECRET"),
 		TokenURL:     "https://api.twitter.com/oauth2/token",
 	}
 	if config.ClientID == "" || config.ClientSecret == "" {
-		log.Println("You must provide a Twitter key and secret key.")
+		log.Println("You must provide a Twitter API key and API secret.")
 	}
 	httpClient := config.Client(context.Background())
 	Client = twitter.NewClient(httpClient)
