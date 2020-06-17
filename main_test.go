@@ -1,75 +1,51 @@
 package main
 
 import (
+	"fmt"
 	"github.com/dghubble/go-twitter/twitter"
-	"log"
-	"reflect"
 	"testing"
+	"time"
 )
 
-func Test_twitterHandler(t *testing.T) {
-	tests := []struct {
-		name string
-	}{
-		{
-			"test",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			twitterHandler()
-		})
-	}
+type SpyTrackedTime struct {
+	time time.Time
 }
 
-func Test_getTweets(t *testing.T) {
+func (t SpyTrackedTime) Now() time.Time {
+	l := time.Location{}
+	t.time = time.Date(2000, 1, 1, 0, 0, 0, 0, &l)
+	return t.time
+}
+
+func Test_getTweet(t *testing.T) {
 	type args struct {
 		screenName string
-		count      int
+		c          chan twitter.Tweet
+		t          SpyTrackedTime
 	}
 	tests := []struct {
 		name string
 		args args
-		want []twitter.Tweet
 	}{
 		{
-			"zero tweets",
+			"receives tweet",
 			args{
 				screenName: "TwitterAPI",
-				count:      0,
-			},
-			[]twitter.Tweet{},
-		}, {
-			"correct user",
-			args{
-				screenName: "TwitterAPI",
-				count:      1,
-			},
-			[]twitter.Tweet{{User: &twitter.User{ScreenName: "TwitterAPI"}}},
-		}, {
-			"multiple tweets",
-			args{
-				screenName: "TwitterAPI",
-				count:      2,
-			},
-			[]twitter.Tweet{
-				{User: &twitter.User{ScreenName: "TwitterAPI"}}, {User: &twitter.User{ScreenName: "TwitterAPI"}},
+				c:          make(chan twitter.Tweet, 1),
+				t:          SpyTrackedTime{},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getTweets(tt.args.screenName, tt.args.count)
-			log.Printf("len of tweets %d\n", len(got))
-			for i, tweet := range got {
-				if tweet.User.ScreenName != tt.want[i].User.ScreenName {
-					t.Errorf("got tweet from user %s, wanted user %s",
-						tt.want[i].User.ScreenName, tweet.User.ScreenName)
-				}
+			go getTweets(tt.args.screenName, tt.args.c, tt.args.t)
+			tweet := <-tt.args.c
+			if tweet.User.ScreenName != tt.args.screenName {
+				t.Errorf("got tweet from user %s, wanted user %s",
+					tt.args.screenName, tweet.User.ScreenName)
 			}
-			if !reflect.DeepEqual(len(got), len(tt.want)) {
-				t.Errorf("getTweets() = %v, want %v", got, tt.want)
-			}
+			fmt.Println(tweet.Text)
+			close(tt.args.c)
 		})
 	}
 }

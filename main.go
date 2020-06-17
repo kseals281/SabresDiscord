@@ -23,6 +23,10 @@ import (
 var Session, _ = discordgo.New()
 var Client *twitter.Client
 
+type TrackedTime interface {
+	Now() time.Time
+}
+
 // Read in all options from environment variables and command line arguments.
 func init() {
 	rand.Seed(time.Now().Unix())
@@ -82,38 +86,32 @@ func main() {
 	defer Session.Close()
 	errCheck("Error opening connection to Discord", err)
 
-	twitterHandler()
-
 	<-interrupt
 }
 
-func twitterHandler() {
-	// Twitter rate limits requests to 100,000 per day OR 1500 per min so we check every 5 sec
+func getTweets(screenName string, c chan twitter.Tweet, tt TrackedTime) {
 	for {
-		if time.Now().Second()%5 == 0 {
-			//tweets := getTweets()
-			//fmt.Println("********************START********************")
-			//for _, t := range tweets {
-			//	fmt.Printf("%+v\n", t.Text)
-			//}
-			//fmt.Println("********************END********************")
+		t := tt.Now()
+
+		// Twitter rate limits requests to 100,000 per day OR 1500 per min so we check every 5 sec
+		if t.Second()%5 == 0 {
+			tweets, _, err := Client.Timelines.UserTimeline(&twitter.UserTimelineParams{
+				ScreenName:     screenName,
+				Count:          1,
+				ExcludeReplies: newTrue(),
+			})
+			if err != nil {
+				log.Printf("Error retrieving tweets from timeline: %+v", err)
+			}
+
+			tweet := tweets[0]
+
+			// Check to see if tweet is new
+			if created, _ := tweet.CreatedAtTime(); created.After(t) {
+				c <- tweet
+			}
 		}
-		time.Sleep(time.Second)
 	}
-
-}
-
-func getTweets(screenName string, c int) []twitter.Tweet {
-	tweets, _, err := Client.Timelines.UserTimeline(&twitter.UserTimelineParams{
-		ScreenName:     screenName,
-		Count:          c,
-		ExcludeReplies: newTrue(),
-	})
-	tweets = tweets[:c] // Count does not actually reduce the number of tweets received.
-	if err != nil {
-		log.Printf("Error retrieving tweets from timeline: %+v", err)
-	}
-	return tweets
 }
 
 func errCheck(msg string, err error) {
