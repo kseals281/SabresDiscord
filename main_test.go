@@ -28,7 +28,6 @@ func (t SpyTrackedTime) Epoch() time.Time {
 }
 
 func Test_getTweet(t *testing.T) {
-	// TODO: Refactor test for channel based approach
 	type args struct {
 		screenNames []string
 		c           chan twitter.Tweet
