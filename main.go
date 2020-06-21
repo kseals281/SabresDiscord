@@ -25,6 +25,22 @@ var Client *twitter.Client
 
 type TrackedTime interface {
 	Now() time.Time
+	Second() time.Duration
+	Epoch() time.Time
+}
+
+type DefaultTime struct{}
+
+func (t *DefaultTime) Now() time.Time {
+	return time.Now()
+}
+
+func (t *DefaultTime) Second() time.Duration {
+	return time.Second
+}
+
+func (t *DefaultTime) Epoch() time.Time {
+	return time.Date(1970, 1, 1, 0, 0, 0, 0, &time.Location{})
 }
 
 // Read in all options from environment variables and command line arguments.
@@ -86,32 +102,70 @@ func main() {
 	defer Session.Close()
 	errCheck("Error opening connection to Discord", err)
 
+	go twitterHandler(Session)
+
 	<-interrupt
 }
 
-func getTweets(screenName string, c chan twitter.Tweet, tt TrackedTime) {
-	for {
-		t := tt.Now()
+func twitterHandler(discord *discordgo.Session) {
+	ch, _ := discord.Channel(os.Getenv("BOT_TESTING_GROUND"))
+	acts := []string{"NHL", "NFL", "NBA", "MLB"}
+	feed := make(chan twitter.Tweet)
 
-		// Twitter rate limits requests to 100,000 per day OR 1500 per min so we check every 5 sec
-		if t.Second()%5 == 0 {
-			tweets, _, err := Client.Timelines.UserTimeline(&twitter.UserTimelineParams{
-				ScreenName:     screenName,
-				Count:          1,
-				ExcludeReplies: newTrue(),
-			})
-			if err != nil {
-				log.Printf("Error retrieving tweets from timeline: %+v", err)
-			}
+	d := DefaultTime{}
 
-			tweet := tweets[0]
+	for _, s := range acts {
+		go getTweets(feed, s, &d)
+	}
 
-			// Check to see if tweet is new
-			if created, _ := tweet.CreatedAtTime(); created.After(t) {
-				c <- tweet
-			}
+	for t := range feed {
+
+		err := postTweetToChannel(t, ch)
+
+		if err != nil {
+			log.Println(fmt.Sprintf("Error posting tweet to channel: %+v", err))
 		}
 	}
+}
+
+func getTweets(c chan twitter.Tweet, screenName string, tt TrackedTime) {
+	// Keep track of the time of the last tweet
+	var prevTweetTime time.Time
+	prevTweetTime = tt.Epoch()
+
+	for {
+		tweets, _, err := Client.Timelines.UserTimeline(&twitter.UserTimelineParams{
+			ScreenName:     screenName,
+			Count:          1,
+			ExcludeReplies: newTrue(),
+		})
+		if err != nil {
+			log.Printf("Error retrieving tweets from timeline: %+v", err)
+			continue
+		}
+
+		// Check to see if tweet is new
+		tweet := tweets[0]
+		if curr, _ := tweet.CreatedAtTime(); curr.After(prevTweetTime) {
+			c <- tweet
+			prevTweetTime = curr
+		}
+
+		// Twitter rate limits requests to 100,000 per day OR 1500 per min so we check every second
+		time.Sleep(tt.Second())
+	}
+}
+
+func postTweetToChannel(tweet twitter.Tweet, ch *discordgo.Channel) error {
+	// Posting link crudely to chat so that the user can trust the embed
+	url := fmt.Sprintf("https://twitter.com/%s/status/%d", tweet.User.ScreenName, tweet.ID)
+
+	_, err := Session.ChannelMessageSend(ch.ID, url)
+	if err != nil {
+		log.Println(fmt.Sprintf("Error sending tweet to channel %s", ch.Name), err)
+		return err
+	}
+	return nil
 }
 
 func errCheck(msg string, err error) {
