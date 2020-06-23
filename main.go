@@ -25,7 +25,6 @@ var Client *twitter.Client
 
 type TrackedTime interface {
 	Now() time.Time
-	Second() time.Duration
 	Epoch() time.Time
 }
 
@@ -33,10 +32,6 @@ type DefaultTime struct{}
 
 func (t *DefaultTime) Now() time.Time {
 	return time.Now()
-}
-
-func (t *DefaultTime) Second() time.Duration {
-	return time.Second
 }
 
 func (t *DefaultTime) Epoch() time.Time {
@@ -152,7 +147,7 @@ func getTweets(c chan twitter.Tweet, screenName string, tt TrackedTime) {
 		}
 
 		// Twitter rate limits requests to 100,000 per day OR 1500 per min so we check every second
-		time.Sleep(tt.Second())
+		time.Sleep(time.Second)
 	}
 }
 

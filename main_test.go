@@ -19,10 +19,6 @@ func (t SpyTrackedTime) Now() time.Time {
 	return t.time
 }
 
-func (t SpyTrackedTime) Second() time.Duration {
-	return 0
-}
-
 func (t SpyTrackedTime) Epoch() time.Time {
 	return time.Time{}
 }
